@@ -13,6 +13,9 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
     software-properties-common \
+    libgl1 \
+    libglib2.0-0 \
+    libpoppler-cpp-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
@@ -33,4 +36,4 @@ ENV PORT=8000
 EXPOSE $PORT
 
 # Start Streamlit
-CMD streamlit run cannae_dashboard.py --server.port=$PORT --server.address=0.0.0.0
+CMD ["streamlit", "run", "cannae_dashboard.py", "--server.port=$PORT", "--server.address=0.0.0.0"]

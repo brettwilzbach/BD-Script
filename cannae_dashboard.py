@@ -17,6 +17,32 @@ from cannae_report_generator import generate_pdf_report
 # ---------- CONFIG ----------
 st.set_page_config(page_title="Cannae Dashboard", layout="wide")
 
+# Debug information for Railway deployment
+import socket
+import sys
+
+# Print debug info to logs
+print(f"\n{'='*50}")
+print(f"STARTUP: Cannae Dashboard initializing")
+print(f"Python version: {sys.version}")
+print(f"Current directory: {os.getcwd()}")
+print(f"Hostname: {socket.gethostname()}")
+print(f"Available environment variables: {[k for k in os.environ.keys() if not ('key' in k.lower() or 'secret' in k.lower() or 'password' in k.lower())]}")
+print(f"PORT env variable: {os.environ.get('PORT', 'Not set')}")
+print(f"{'='*50}\n")
+
+# Add visual confirmation in sidebar
+def add_deployment_info():
+    with st.sidebar.expander("✅ Deployment Info", expanded=False):
+        st.info(f"App successfully loaded!\nRunning on: {socket.gethostname()}\nPort: {os.environ.get('PORT', 'default')}\nPython: {sys.version.split()[0]}")
+        
+        if 'RAILWAY_STATIC_URL' in os.environ:
+            st.success("✓ Running on Railway")
+        elif 'HEROKU_APP_ID' in os.environ:
+            st.success("✓ Running on Heroku")
+        else:
+            st.success("✓ Running locally")
+
 # Updated paths for organized directory structure - OS-agnostic for Railway compatibility
 import os
 
@@ -593,6 +619,9 @@ except Exception as e:
     })
 LOGO_FILE = os.path.join(DATA_PATH, "Cannae-logo.jpg")
 st.sidebar.image(LOGO_FILE)
+
+# Display deployment info in sidebar
+add_deployment_info()
 
 # ---------- EXTRACT KPIS ----------
 # Extract KPIs from Excel sheet
