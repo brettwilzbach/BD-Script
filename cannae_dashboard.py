@@ -17,11 +17,21 @@ from cannae_report_generator import generate_pdf_report
 # ---------- CONFIG ----------
 st.set_page_config(page_title="Cannae Dashboard", layout="wide")
 
-# Updated paths for organized directory structure
-BASE_PATH = "I:\\BW Code\\BD Script\\"
-DATA_PATH = BASE_PATH + "data\\"
-REPORTS_PATH = BASE_PATH + "reports\\"
-ASSETS_PATH = BASE_PATH + "assets\\"
+# Updated paths for organized directory structure - OS-agnostic for Railway compatibility
+import os
+
+# Determine if running locally or on Railway
+if os.path.exists("I:\\BW Code\\BD Script"):
+    # Local Windows path
+    BASE_PATH = "I:\\BW Code\\BD Script"
+else:
+    # Railway path (current directory)
+    BASE_PATH = os.path.dirname(os.path.abspath(__file__))
+
+# Use os.path.join for OS-agnostic paths
+DATA_PATH = os.path.join(BASE_PATH, "data")
+REPORTS_PATH = os.path.join(BASE_PATH, "reports")
+ASSETS_PATH = os.path.join(BASE_PATH, "assets")
 
 # Custom CSS for styling
 custom_css = """
