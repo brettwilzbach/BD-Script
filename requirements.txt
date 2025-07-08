@@ -1,11 +1,21 @@
-streamlit>=1.17.0
-pandas>=2.0.0
-numpy>=1.24.0
-plotly>=5.5.0
-fpdf>=1.7.2
-pdfplumber>=0.7.0
-matplotlib>=3.5.1
-reportlab>=3.6.6
-python-dateutil>=2.8.2
-setuptools>=65.5.0
-wheel>=0.38.0
+# Core packages
+streamlit==1.17.0
+
+# Pre-built binary packages (faster installation)
+numpy==1.24.0
+pandas==2.0.0
+pyarrow==14.0.1
+
+# Visualization
+plotly==5.5.0
+matplotlib==3.5.1
+
+# PDF handling (slimmed down)
+fpdf==1.7.2
+reportlab==3.6.6
+pdfplumber==0.7.0
+
+# Dependencies
+python-dateutil==2.8.2
+setuptools==65.5.0
+wheel==0.38.0
