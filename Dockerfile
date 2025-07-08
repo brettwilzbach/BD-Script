@@ -44,5 +44,5 @@ RUN mkdir -p data reports assets
 ENV PORT=8000
 EXPOSE $PORT
 
-# Start Streamlit
-CMD streamlit run cannae_dashboard.py --server.port=$PORT --server.address=0.0.0.0
+# Start Streamlit (using environment variables set in the script)
+CMD streamlit run cannae_dashboard.py

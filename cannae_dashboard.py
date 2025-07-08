@@ -1,5 +1,10 @@
 # cannae_dashboard.py
 
+# Dynamic port override for Railway compatibility
+import os
+os.environ["STREAMLIT_SERVER_PORT"] = os.environ.get("PORT", "8501")
+os.environ["STREAMLIT_SERVER_ADDRESS"] = "0.0.0.0"
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -617,8 +622,16 @@ except Exception as e:
         'Fund Name': ['Fund A', 'Fund B', 'Fund C', 'Fund D', 'Fund E', 'Fund F', 'Fund G', 'Fund H'],
         'YTD Return': [2.1, 2.5, 2.8, 3.0, 3.2, 3.5, 3.8, 4.0]
     })
-LOGO_FILE = os.path.join(DATA_PATH, "Cannae-logo.jpg")
-st.sidebar.image(LOGO_FILE)
+# Use OS-agnostic path to assets directory
+ASSETS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets')
+LOGO_FILE = os.path.join(ASSETS_PATH, "Cannae-logo.jpg")
+
+# Add error handling for logo display
+try:
+    st.sidebar.image(LOGO_FILE)
+except Exception as e:
+    st.sidebar.warning(f"Logo not found. Using text header instead.")
+    st.sidebar.title("Cannae Dashboard")
 
 # Display deployment info in sidebar
 add_deployment_info()
