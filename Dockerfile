@@ -45,4 +45,4 @@ ENV PORT=8000
 EXPOSE $PORT
 
 # Start Streamlit
-CMD ["streamlit", "run", "cannae_dashboard.py", "--server.port=$PORT", "--server.address=0.0.0.0"]
+CMD streamlit run cannae_dashboard.py --server.port=$PORT --server.address=0.0.0.0
