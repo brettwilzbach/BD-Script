@@ -16,14 +16,23 @@ RUN apt-get update && apt-get install -y \
     libgl1 \
     libglib2.0-0 \
     libpoppler-cpp-dev \
+    libfreetype6-dev \
+    libjpeg-dev \
+    zlib1g-dev \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libffi-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
+# Install Python dependencies with special handling for reportlab
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir wheel setuptools && \
+    pip install --no-cache-dir pillow==9.5.0 && \
+    pip install --no-cache-dir --only-binary=:all: reportlab==3.6.12 && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application
 COPY . .
