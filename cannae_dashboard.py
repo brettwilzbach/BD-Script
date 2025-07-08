@@ -16,7 +16,12 @@ from cannae_report_generator import generate_pdf_report
 
 # ---------- CONFIG ----------
 st.set_page_config(page_title="Cannae Dashboard", layout="wide")
-DATA_PATH = "I:\\BW Code\\BD Script\\"
+
+# Updated paths for organized directory structure
+BASE_PATH = "I:\\BW Code\\BD Script\\"
+DATA_PATH = BASE_PATH + "data\\"
+REPORTS_PATH = BASE_PATH + "reports\\"
+ASSETS_PATH = BASE_PATH + "assets\\"
 
 # Custom CSS for styling
 custom_css = """
