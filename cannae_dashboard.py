@@ -2776,27 +2776,31 @@ def generate_mock_trades(count, larger_amounts=False):
         
         for _, trade in last_trades.iterrows():
             # Format the trade date
+            if isinstance(trade['Trade Date'], pd.Timestamp):
+                trade_date = trade['Trade Date'].strftime('%m/%d/%Y')
+            else:
+                trade_date = str(trade['Trade Date'])
             
-        # Determine if it's a buy or sell
-        trade_type = "Buy" if "buy" in str(trade['Transaction']).lower() else "Sell"
+            # Determine if it's a buy or sell
+            trade_type = "Buy" if "buy" in str(trade['Transaction']).lower() else "Sell"
             
-        # Format the proceeds
-        proceeds = abs(trade['Proceeds'])
-        proceeds_str = f"${proceeds:,.2f}"
+            # Format the proceeds
+            proceeds = abs(trade['Proceeds'])
+            proceeds_str = f"${proceeds:,.2f}"
             
-        # Use the correct column names based on what's available
-        security_desc = str(trade.get('Security Description', 'Unknown Security'))
-        clean_strategy = str(trade.get('CleanStrategy', 'Unknown Strategy'))
-        strategy = str(trade.get('Strategy', 'Unknown Strategy'))
+            # Use the correct column names based on what's available
+            security_desc = str(trade.get('Security Description', 'Unknown Security'))
+            clean_strategy = str(trade.get('CleanStrategy', 'Unknown Strategy'))
+            strategy = str(trade.get('Strategy', 'Unknown Strategy'))
             
-        last_5_trades.append([
-            trade_date,
-            trade_type,
-            security_desc,
-            clean_strategy,
-            strategy,
-            proceeds_str
-        ])
+            last_5_trades.append([
+                trade_date,
+                trade_type,
+                security_desc,
+                clean_strategy,
+                strategy,
+                proceeds_str
+            ])
     
 # Extract top 5 largest trades
 top_5_largest = []
@@ -2817,29 +2821,27 @@ if 'filtered_trades' in globals() and not filtered_trades.empty:
         # Format the proceeds
         proceeds = abs(trade['Proceeds'])
         proceeds_str = f"${proceeds:,.2f}"
-            proceeds = abs(trade['Proceeds'])
-            proceeds_str = f"${proceeds:,.2f}"
-            
-            # Use the correct column names based on what's available
-            security_desc = str(trade.get('Security Description', 'Unknown Security'))
-            clean_strategy = str(trade.get('CleanStrategy', 'Unknown Strategy'))
-            strategy = str(trade.get('Strategy', 'Unknown Strategy'))
-            
-            top_5_largest.append([
-                trade_date,
-                trade_type,
-                security_desc,
-                clean_strategy,
-                strategy,
-                proceeds_str
-            ])
+        
+        # Use the correct column names based on what's available
+        security_desc = str(trade.get('Security Description', 'Unknown Security'))
+        clean_strategy = str(trade.get('CleanStrategy', 'Unknown Strategy'))
+        strategy = str(trade.get('Strategy', 'Unknown Strategy'))
+        
+        top_5_largest.append([
+            trade_date,
+            trade_type,
+            security_desc,
+            clean_strategy,
+            strategy,
+            proceeds_str
+        ])
     
-    return {
-        'summary': summary_data,
-        'last_5_trades': last_5_trades,
-        'top_5_largest': top_5_largest
-    }
-trading_data = extract_trading_data_for_pdf()
+# Store the extracted data
+trading_data = {
+    'summary': summary_data,
+    'last_5_trades': last_5_trades,
+    'top_5_largest': top_5_largest
+}
 
 # Create key stats dictionary for the PDF report with actual values from the dashboard
 key_stats_for_pdf = {
