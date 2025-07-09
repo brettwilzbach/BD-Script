@@ -2836,12 +2836,8 @@ if 'filtered_trades' in globals() and not filtered_trades.empty:
             proceeds_str
         ])
     
-# Store the extracted data
-trading_data = {
-    'summary': summary_data,
-    'last_5_trades': last_5_trades,
-    'top_5_largest': top_5_largest
-}
+# Extract trading data by calling the function
+trading_data = extract_trading_data_for_pdf()
 
 # Create key stats dictionary for the PDF report with actual values from the dashboard
 key_stats_for_pdf = {
