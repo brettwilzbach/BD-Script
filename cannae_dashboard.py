@@ -22,31 +22,8 @@ from cannae_report_generator import generate_pdf_report
 # ---------- CONFIG ----------
 st.set_page_config(page_title="Cannae Dashboard", layout="wide")
 
-# Debug information for Railway deployment
-import socket
 import sys
-
-# Print debug info to logs
-print(f"\n{'='*50}")
-print(f"STARTUP: Cannae Dashboard initializing")
-print(f"Python version: {sys.version}")
-print(f"Current directory: {os.getcwd()}")
-print(f"Hostname: {socket.gethostname()}")
-print(f"Available environment variables: {[k for k in os.environ.keys() if not ('key' in k.lower() or 'secret' in k.lower() or 'password' in k.lower())]}")
-print(f"PORT env variable: {os.environ.get('PORT', 'Not set')}")
-print(f"{'='*50}\n")
-
-# Add visual confirmation in sidebar
-def add_deployment_info():
-    with st.sidebar.expander("✅ Deployment Info", expanded=False):
-        st.info(f"App successfully loaded!\nRunning on: {socket.gethostname()}\nPort: {os.environ.get('PORT', 'default')}\nPython: {sys.version.split()[0]}")
-        
-        if 'RAILWAY_STATIC_URL' in os.environ:
-            st.success("✓ Running on Railway")
-        elif 'HEROKU_APP_ID' in os.environ:
-            st.success("✓ Running on Heroku")
-        else:
-            st.success("✓ Running locally")
+import socket
 
 # Updated paths for organized directory structure - OS-agnostic for Railway compatibility
 import os
@@ -633,8 +610,7 @@ except Exception as e:
     st.sidebar.warning(f"Logo not found. Using text header instead.")
     st.sidebar.title("Cannae Dashboard")
 
-# Display deployment info in sidebar
-add_deployment_info()
+# Sidebar already has logo/title
 
 # ---------- EXTRACT KPIS ----------
 # Extract KPIs from Excel sheet
@@ -912,26 +888,40 @@ with col1:
         axis=1
     )
     
+    # Print strategy names to console for debugging
+    print("\n--- April Allocation Strategies for Pie Chart ---")
+    print(april_alloc_data['Strategy'].unique())
+    print("-----------------------------------------------\n")
+    
     logging.debug("--- April Allocation Strategies for Pie Chart ---")
     logging.debug(april_alloc_data['Strategy'].unique())
     logging.debug("-----------------------------------------------")
 
     # Plot month-end allocation
     strategy_color_map = {
-        'CMBS F1': '#20c997',      # Teal for CMBS F1
-        'AIRCRAFT F1': '#adb5bd', # Gray for AIRCRAFT F1
-        'ABS': '#6c757d',           # Darker Gray for ABS (if it appears)
-        'CLO': '#6f42c1',           # Purple for CLO (if it appears)
-        'SHORT TERM': '#0dcaf0',    # Light Blue for SHORT TERM
-        # HEDGE will use the fallback color_discrete_sequence
+        # CMBS variations
+        'CMBS F1': '#3A606E',      # Teal for CMBS F1 (as requested)
+        'CMBS': '#3A606E',         # Same teal for any CMBS variation
+        'CMBS F2': '#3A606E',      # Same teal for any CMBS variation
+        'CMBS FUND': '#3A606E',    # Same teal for any CMBS variation
+        
+        # Other strategies
+        'AIRCRAFT F1': '#475569',  # Slate gray for AIRCRAFT F1
+        'AIRCRAFT': '#475569',     # Same gray for any AIRCRAFT variation
+        'ABS': '#6366F1',          # Indigo for ABS
+        'CLO': '#8B5CF6',          # Violet for CLO
+        'SHORT TERM': '#0EA5E9',   # Sky blue for SHORT TERM
+        'HEDGE': '#64748B',        # Slate for HEDGE
+        'CASH': '#94A3B8',         # Light slate for CASH
     }
     fig_april = px.pie(
         april_alloc_data, 
         values="Market Value", 
         names="Strategy", 
         title=f"{month_name} Portfolio Allocation",
+        color="Strategy",  # Explicitly use Strategy as the color dimension
         color_discrete_map=strategy_color_map,
-        color_discrete_sequence=["#17a2b8", "#138496", "#117a8b", "#0e6471", "#0c5460", "#0a444f"], # Fallback for unmapped
+        color_discrete_sequence=["#0F766E", "#0E7490", "#0369A1", "#1D4ED8", "#4338CA", "#6D28D9"], # Blue-teal palette fallback
         custom_data=["Hover Info"]
     )
     
@@ -986,26 +976,40 @@ with col2:
         axis=1
     )
     
+    # Print strategy names to console for debugging
+    print("\n--- Current Allocation Strategies for Pie Chart ---")
+    print(current_alloc_data['Strategy'].unique())
+    print("-------------------------------------------------\n")
+    
     logging.debug("--- Current Allocation Strategies for Pie Chart ---")
     logging.debug(current_alloc_data['Strategy'].unique())
     logging.debug("-------------------------------------------------")
 
-    # Plot current allocation
+    # Plot current allocation - using same color scheme as month-end for consistency
     strategy_color_map = {
-        'CMBS F1': '#20c997',      # Teal for CMBS F1
-        'AIRCRAFT F1': '#adb5bd', # Gray for AIRCRAFT F1
-        'ABS': '#6c757d',           # Darker Gray for ABS (if it appears)
-        'CLO': '#6f42c1',           # Purple for CLO (if it appears)
-        'SHORT TERM': '#0dcaf0',    # Light Blue for SHORT TERM
-        # HEDGE will use the fallback color_discrete_sequence
+        # CMBS variations
+        'CMBS F1': '#3A606E',      # Teal for CMBS F1 (as requested)
+        'CMBS': '#3A606E',         # Same teal for any CMBS variation
+        'CMBS F2': '#3A606E',      # Same teal for any CMBS variation
+        'CMBS FUND': '#3A606E',    # Same teal for any CMBS variation
+        
+        # Other strategies
+        'AIRCRAFT F1': '#475569',  # Slate gray for AIRCRAFT F1
+        'AIRCRAFT': '#475569',     # Same gray for any AIRCRAFT variation
+        'ABS': '#6366F1',          # Indigo for ABS
+        'CLO': '#8B5CF6',          # Violet for CLO
+        'SHORT TERM': '#0EA5E9',   # Sky blue for SHORT TERM
+        'HEDGE': '#64748B',        # Slate for HEDGE
+        'CASH': '#94A3B8',         # Light slate for CASH
     }
     fig_current = px.pie(
         current_alloc_data, 
         values="Market Value", 
         names="Strategy", 
         title=f"Current Portfolio Allocation ({date_str})",
+        color="Strategy",  # Explicitly use Strategy as the color dimension
         color_discrete_map=strategy_color_map,
-        color_discrete_sequence=["#17a2b8", "#138496", "#117a8b", "#0e6471", "#0c5460", "#0a444f"], # Fallback for unmapped
+        color_discrete_sequence=["#0F766E", "#0E7490", "#0369A1", "#1D4ED8", "#4338CA", "#6D28D9"], # Blue-teal palette fallback
         custom_data=["Hover Info"]
     )
     
@@ -2054,11 +2058,36 @@ if st.button(label="Download Portfolio Snapshot PDF"):
             pdf_obj.ln(2) # Add some space after the chart if it's the last in its line/block
             pdf_obj.ln(3)
 
+    # Path to the elephant watermark image
+    elephant_watermark_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Elephant Watermark.png")
+    
     # Create PDF with better margins and settings
     pdf = FPDF(orientation='P', unit='mm', format='A4')
     pdf.set_margins(15, 15, 15)  # Left, Top, Right margins
     pdf.set_auto_page_break(auto=True, margin=20)  # Increased bottom margin
+    
     pdf.add_page()
+    
+    # Add elephant watermark if the file exists
+    if os.path.exists(elephant_watermark_path):
+        # Save current position
+        current_x, current_y = pdf.get_x(), pdf.get_y()
+        
+        # Position watermark in top left area
+        watermark_width = 50  # mm - smaller size
+        watermark_height = 50  # mm - smaller size
+        x = 15  # Left margin
+        y = 40  # Just below the header
+        
+        # Draw the watermark with higher contrast
+        pdf.set_draw_color(120, 120, 120)  # Darker gray for better visibility
+        pdf.set_text_color(120, 120, 120)  # Darker gray for better visibility
+        pdf.image(elephant_watermark_path, x=x, y=y, w=watermark_width, h=watermark_height)
+        
+        # Restore position and colors
+        pdf.set_draw_color(0, 0, 0)  # Reset to black
+        pdf.set_text_color(0, 0, 0)  # Reset to black
+        pdf.set_xy(current_x, current_y)
     
     # Add a light gray header background
     pdf.set_fill_color(240, 240, 240)  # Light gray background
@@ -2078,10 +2107,15 @@ if st.button(label="Download Portfolio Snapshot PDF"):
     # Add title next to logo
     pdf.set_xy(55, 10)
     pdf.set_font("Arial", "B", 18)
-    pdf.cell(100, 10, "Cannae", 0, 1)
+    pdf.cell(100, 10, "Cannae Report", 0, 1)
+    
+    # Get current date for the report
+    from datetime import datetime
+    current_date = datetime.now().strftime("%B %d, %Y")
+    
     pdf.set_xy(55, 20)
     pdf.set_font("Arial", "B", 14)
-    pdf.cell(100, 8, "Portfolio Snapshot - April 2025", 0, 1)
+    pdf.cell(100, 8, f"{current_date}", 0, 1)
     
     pdf.ln(20)  # Space after header
 
@@ -2742,49 +2776,47 @@ def generate_mock_trades(count, larger_amounts=False):
         
         for _, trade in last_trades.iterrows():
             # Format the trade date
-            if isinstance(trade['Trade Date'], pd.Timestamp):
-                trade_date = trade['Trade Date'].strftime('%m/%d/%Y')
-            else:
-                trade_date = str(trade['Trade Date'])
             
-            # Determine if it's a buy or sell
-            trade_type = "Buy" if "buy" in str(trade['Transaction']).lower() else "Sell"
+        # Determine if it's a buy or sell
+        trade_type = "Buy" if "buy" in str(trade['Transaction']).lower() else "Sell"
             
-            # Format the proceeds
-            proceeds = abs(trade['Proceeds'])
-            proceeds_str = f"${proceeds:,.2f}"
+        # Format the proceeds
+        proceeds = abs(trade['Proceeds'])
+        proceeds_str = f"${proceeds:,.2f}"
             
-            # Use the correct column names based on what's available
-            security_desc = str(trade.get('Security Description', 'Unknown Security'))
-            clean_strategy = str(trade.get('CleanStrategy', 'Unknown Strategy'))
-            strategy = str(trade.get('Strategy', 'Unknown Strategy'))
+        # Use the correct column names based on what's available
+        security_desc = str(trade.get('Security Description', 'Unknown Security'))
+        clean_strategy = str(trade.get('CleanStrategy', 'Unknown Strategy'))
+        strategy = str(trade.get('Strategy', 'Unknown Strategy'))
             
-            last_5_trades.append([
-                trade_date,
-                trade_type,
-                security_desc,
-                clean_strategy,
-                strategy,
-                proceeds_str
-            ])
+        last_5_trades.append([
+            trade_date,
+            trade_type,
+            security_desc,
+            clean_strategy,
+            strategy,
+            proceeds_str
+        ])
     
-    # Extract top 5 largest trades
-    top_5_largest = []
-    if 'filtered_trades' in globals() and not filtered_trades.empty:
-        # Get the top 5 largest trades by absolute market value
-        largest_trades = filtered_trades.sort_values("Abs_Proceeds", ascending=False).head(5)
+# Extract top 5 largest trades
+top_5_largest = []
+if 'filtered_trades' in globals() and not filtered_trades.empty:
+    # Get the top 5 largest trades by absolute market value
+    largest_trades = filtered_trades.sort_values("Abs_Proceeds", ascending=False).head(5)
         
-        for _, trade in largest_trades.iterrows():
-            # Format the trade date
-            if isinstance(trade['Trade Date'], pd.Timestamp):
-                trade_date = trade['Trade Date'].strftime('%m/%d/%Y')
-            else:
-                trade_date = str(trade['Trade Date'])
+    for _, trade in largest_trades.iterrows():
+        # Format the trade date
+        if isinstance(trade['Trade Date'], pd.Timestamp):
+            trade_date = trade['Trade Date'].strftime('%m/%d/%Y')
+        else:
+            trade_date = str(trade['Trade Date'])
             
-            # Determine if it's a buy or sell
-            trade_type = "Buy" if "buy" in str(trade['Transaction']).lower() else "Sell"
+        # Determine if it's a buy or sell
+        trade_type = "Buy" if "buy" in str(trade['Transaction']).lower() else "Sell"
             
-            # Format the proceeds
+        # Format the proceeds
+        proceeds = abs(trade['Proceeds'])
+        proceeds_str = f"${proceeds:,.2f}"
             proceeds = abs(trade['Proceeds'])
             proceeds_str = f"${proceeds:,.2f}"
             
@@ -3022,8 +3054,8 @@ try:
         b64 = base64.b64encode(f.read()).decode()
         st.markdown(f'''
             <div style="background-color: #f0f2f6; padding: 10px; border-radius: 5px; text-align: center;">
-                <a href="data:application/pdf;base64,{b64}" download="Cannae_Fund_Report.pdf" style="font-size: 16px; text-decoration: none; color: #007bff; font-weight: bold;">
-                    Download Cannae Fund Report PDF
+                <a href="data:application/pdf;base64,{b64}" download="Cannae_Report.pdf" style="font-size: 16px; text-decoration: none; color: #007bff; font-weight: bold;">
+                    Download Cannae Report PDF
                 </a>
             </div>
         ''', unsafe_allow_html=True)

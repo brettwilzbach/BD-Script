@@ -449,14 +449,16 @@ def generate_pdf_report(output_path, key_stats=None, fig_pl_gainers=None, fig_pl
     # Get today's date for the header
     today = datetime.now().strftime("%B %d, %Y")
     
-    # Path to the logo file
-    LOGO_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'BD Script', 'Cannae-logo.jpg')
+    # Path to the logo and watermark files
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    LOGO_FILE = os.path.join(BASE_DIR, 'Cannae-logo.jpg')
+    WATERMARK_FILE = os.path.join(BASE_DIR, 'Elephant Watermark.png')
 
     # Create a PDF document with smaller margins and a header/footer
     class PDFWithHeader(SimpleDocTemplate):
         def __init__(self, filename, **kwargs):
             SimpleDocTemplate.__init__(self, filename, **kwargs)
-            self.header_text = f"Cannae Fund Report - {today}"
+            self.header_text = f"Cannae Report - {today}"
             
         def build(self, flowables, **kwargs):
             self._calc()  # Calculate the document dimensions
@@ -464,6 +466,24 @@ def generate_pdf_report(output_path, key_stats=None, fig_pl_gainers=None, fig_pl
             # Define a header function that adds the title to each page
             def header_footer(canvas, doc):
                 canvas.saveState()
+                
+                # Add elephant watermark if the file exists
+                if os.path.exists(WATERMARK_FILE):
+                    # Position watermark in bottom right area where there's more white space
+                    watermark_width = 70  # mm - slightly larger for better visibility
+                    watermark_height = 70  # mm - slightly larger for better visibility
+                    
+                    # Calculate position for the very bottom right corner
+                    # Position it at the very edge of the page
+                    x = doc.width + doc.leftMargin - watermark_width  # Extreme right edge
+                    y = 5  # Very bottom with minimal margin
+                    
+                    # Draw the watermark with 50% opacity (simulated with lighter gray)
+                    canvas.saveState()
+                    # ReportLab doesn't support alpha directly in this context, use lighter gray instead
+                    canvas.setFillColorRGB(0.75, 0.75, 0.75)  # 75% gray (lighter) to simulate opacity
+                    canvas.drawImage(WATERMARK_FILE, x, y, width=watermark_width, height=watermark_height, mask='auto')
+                    canvas.restoreState()
                 
                 # Header
                 canvas.setFont('Helvetica-Bold', 12)
