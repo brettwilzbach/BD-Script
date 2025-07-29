@@ -685,7 +685,32 @@ key_stats_row4_col2.metric("Repo MV", key_stats.get("repo_mv", "N/A"))
 # ---------- ALLOCATION: PIE + DRIFT ----------
 
 
-def summarize_alloc(df):
+def categorize_cmbs(strategy):
+    """Categorize CMBS holdings into Conduit, SASB, and Other categories."""
+    # Check if this is a CMBS strategy
+    if not isinstance(strategy, str) or 'CMBS' not in str(strategy).upper():
+        return strategy
+    
+    strategy_str = str(strategy).upper()
+    
+    # Debug logging to see what strategies we're processing
+    logging.debug(f"Categorizing CMBS strategy: {strategy}")
+    
+    # Categorize CMBS Conduit - check for 2.0/3.0 patterns
+    if any(conduit_pattern in strategy_str for conduit_pattern in ['2.0/3.0', '2.0', '3.0', 'NON-IG']):
+        logging.debug(f"  -> Categorized as CMBS Conduit: {strategy}")
+        return 'CMBS Conduit'
+    
+    # Categorize CMBS SASB - check for all SASB patterns
+    if 'SASB' in strategy_str or 'SASB F1' in strategy_str or 'SASB F1_INCOME' in strategy_str:
+        logging.debug(f"  -> Categorized as CMBS SASB: {strategy}")
+        return 'CMBS SASB'
+    
+    # All other CMBS go to Other category
+    logging.debug(f"  -> Categorized as CMBS - Other: {strategy}")
+    return 'CMBS - Other'
+
+def summarize_alloc(df, split_cmbs=True):
     # Create a copy of the dataframe to avoid modifying the original
     df = df.copy()
     
@@ -706,6 +731,39 @@ def summarize_alloc(df):
             st.error(f"No strategy column found. Available columns: {df.columns.tolist()}")
             df['Strategy'] = 'UNKNOWN'
     
+    # Check for Sub Strategy column for CMBS breakdown
+    sub_strategy_column = 'Sub Strategy'
+    has_sub_strategy = sub_strategy_column in df.columns
+    
+    # If we have Sub Strategy column, use it for CMBS F1 items
+    if has_sub_strategy:
+        # Create a new column for the effective strategy (either Strategy or Sub Strategy)
+        df['Effective Strategy'] = df['Strategy']
+        
+        # For CMBS F1 items, use the Sub Strategy value if available
+        cmbs_mask = df['Strategy'].str.contains('CMBS F1', case=False, na=False)
+        has_sub_strategy_mask = ~df[sub_strategy_column].isna() & (df[sub_strategy_column] != '')
+        
+        # Only replace Strategy with Sub Strategy for CMBS F1 items that have a valid Sub Strategy
+        replace_mask = cmbs_mask & has_sub_strategy_mask
+        if replace_mask.any():
+            # For CMBS F1 items with SASB in the Sub Strategy, set to CMBS SASB
+            sasb_mask = replace_mask & df[sub_strategy_column].str.contains('SASB', case=False, na=False)
+            if sasb_mask.any():
+                df.loc[sasb_mask, 'Effective Strategy'] = 'CMBS SASB'
+                logging.debug(f"Applied CMBS SASB to {sasb_mask.sum()} CMBS F1 items with SASB in Sub Strategy")
+            
+            # For other CMBS F1 items, use the Sub Strategy as is
+            other_mask = replace_mask & ~df[sub_strategy_column].str.contains('SASB', case=False, na=False)
+            if other_mask.any():
+                df.loc[other_mask, 'Effective Strategy'] = df.loc[other_mask, sub_strategy_column]
+                logging.debug(f"Applied Sub Strategy to {other_mask.sum()} other CMBS F1 items")
+            
+            logging.debug(f"Total: Applied strategy mapping to {replace_mask.sum()} CMBS F1 items")
+    else:
+        # If no Sub Strategy column, just use the Strategy column
+        df['Effective Strategy'] = df['Strategy']
+        logging.debug("No Sub Strategy column found, using Strategy column only")
     
     # Specifically use Admin Net MV column as requested
     mv_column = 'Admin Net MV'
@@ -740,10 +798,10 @@ def summarize_alloc(df):
     # Debug: Log filtered dataframe details
     logging.debug(f"Summarize Alloc - Debug - Filtered Data - Using column: {mv_column}")
     logging.debug(f"Summarize Alloc - Debug - Filtered Data - Total {mv_column} before grouping: ${df[mv_column].sum():,.2f}")
-    logging.debug(f"Summarize Alloc - Debug - Filtered Data - Head of df[['Strategy', mv_column]]:\n{df[['Strategy', mv_column]].head()}")
+    logging.debug(f"Summarize Alloc - Debug - Filtered Data - Head of df[['Effective Strategy', mv_column]]:\n{df[['Effective Strategy', mv_column]].head()}")
     
-    # Group by Strategy and sum the MV column
-    result = df.groupby("Strategy")[mv_column].sum().reset_index()
+    # Group by Effective Strategy and sum the MV column
+    result = df.groupby("Effective Strategy")[mv_column].sum().reset_index()
     result.columns = ["Strategy", "Market Value"]
     
     # Only include non-zero market values
@@ -752,6 +810,14 @@ def summarize_alloc(df):
     
     logging.debug(f"Summarize Alloc - Total Market Value: ${result['Market Value'].sum():,.2f}")
     logging.debug(f"Summarize Alloc - Should match AUM: {kpi_data['aum_str']}")
+    
+    # Apply CMBS categorization if requested
+    if split_cmbs:
+        # Apply the categorize_cmbs function to each strategy
+        result['Strategy'] = result['Strategy'].apply(categorize_cmbs)
+        
+        # Re-group to combine the categorized CMBS strategies
+        result = result.groupby("Strategy")["Market Value"].sum().reset_index()
     
     return result
 
@@ -795,8 +861,8 @@ with col1:
                 if col_name in month_end_holdings.columns:
                     logging.debug(f"  Found potential strategy column '{col_name}': {month_end_holdings[col_name].unique()}")
                         
-        # Use summarize_alloc to get month-end allocation data
-        april_alloc_data = summarize_alloc(month_end_holdings)
+        # Use summarize_alloc to get month-end allocation data with CMBS breakdown
+        april_alloc_data = summarize_alloc(month_end_holdings, split_cmbs=True)
     except Exception as e:
         st.error(f"Error loading data from {month_name} file: {e}")
         # Create empty DataFrame as fallback
@@ -849,8 +915,8 @@ with col2:
                 if col_name in HOLDINGS_LATEST.columns:
                     logging.debug(f"  Found potential strategy column '{col_name}': {HOLDINGS_LATEST[col_name].unique()}")
         
-        # Use summarize_alloc to get current allocation data
-        current_alloc_data = summarize_alloc(HOLDINGS_LATEST)
+        # Use summarize_alloc to get current allocation data with CMBS breakdown
+        current_alloc_data = summarize_alloc(HOLDINGS_LATEST, split_cmbs=True)
     except Exception as e:
         st.error(f"Error loading current holdings data: {e}")
         # Create empty DataFrame as fallback
@@ -899,11 +965,16 @@ with col1:
 
     # Plot month-end allocation
     strategy_color_map = {
-        # CMBS variations
-        'CMBS F1': '#3A606E',      # Teal for CMBS F1 (as requested)
-        'CMBS': '#3A606E',         # Same teal for any CMBS variation
-        'CMBS F2': '#3A606E',      # Same teal for any CMBS variation
-        'CMBS FUND': '#3A606E',    # Same teal for any CMBS variation
+        # CMBS variations with new breakdown - using teal color variations
+        'CMBS Conduit': '#0F766E',  # Dark teal for CMBS Conduit
+        'CMBS SASB': '#14B8A6',     # Medium teal for CMBS SASB
+        'CMBS - Other': '#5EEAD4',  # Light teal for CMBS Other
+        
+        # Original CMBS variations (kept for backward compatibility)
+        'CMBS F1': '#0F766E',      # Teal for CMBS F1 (as requested)
+        'CMBS': '#0F766E',         # Same teal for any CMBS variation
+        'CMBS F2': '#0F766E',      # Same teal for any CMBS variation
+        'CMBS FUND': '#0F766E',    # Same teal for any CMBS variation
         
         # Other strategies
         'AIRCRAFT F1': '#475569',  # Slate gray for AIRCRAFT F1
@@ -922,7 +993,8 @@ with col1:
         color="Strategy",  # Explicitly use Strategy as the color dimension
         color_discrete_map=strategy_color_map,
         color_discrete_sequence=["#0F766E", "#0E7490", "#0369A1", "#1D4ED8", "#4338CA", "#6D28D9"], # Blue-teal palette fallback
-        custom_data=["Hover Info"]
+        custom_data=["Hover Info"],
+        category_orders={"Strategy": sorted(april_alloc_data["Strategy"].unique(), key=lambda x: (0 if "CMBS" in x else 1, x))}
     )
     
     # Format April pie chart
@@ -986,12 +1058,18 @@ with col2:
     logging.debug("-------------------------------------------------")
 
     # Plot current allocation - using same color scheme as month-end for consistency
+    # Use the same color map as the month-end chart for consistency
     strategy_color_map = {
-        # CMBS variations
-        'CMBS F1': '#3A606E',      # Teal for CMBS F1 (as requested)
-        'CMBS': '#3A606E',         # Same teal for any CMBS variation
-        'CMBS F2': '#3A606E',      # Same teal for any CMBS variation
-        'CMBS FUND': '#3A606E',    # Same teal for any CMBS variation
+        # CMBS variations with new breakdown - using teal color variations
+        'CMBS Conduit': '#0F766E',  # Dark teal for CMBS Conduit
+        'CMBS SASB': '#14B8A6',     # Medium teal for CMBS SASB
+        'CMBS - Other': '#5EEAD4',  # Light teal for CMBS Other
+        
+        # Original CMBS variations (kept for backward compatibility)
+        'CMBS F1': '#0F766E',      # Teal for CMBS F1 (as requested)
+        'CMBS': '#0F766E',         # Same teal for any CMBS variation
+        'CMBS F2': '#0F766E',      # Same teal for any CMBS variation
+        'CMBS FUND': '#0F766E',    # Same teal for any CMBS variation
         
         # Other strategies
         'AIRCRAFT F1': '#475569',  # Slate gray for AIRCRAFT F1
@@ -1006,11 +1084,12 @@ with col2:
         current_alloc_data, 
         values="Market Value", 
         names="Strategy", 
-        title=f"Current Portfolio Allocation ({date_str})",
-        color="Strategy",  # Explicitly use Strategy as the color dimension
+        title=f"{date_str} Portfolio Allocation",
+        color="Strategy",
         color_discrete_map=strategy_color_map,
         color_discrete_sequence=["#0F766E", "#0E7490", "#0369A1", "#1D4ED8", "#4338CA", "#6D28D9"], # Blue-teal palette fallback
-        custom_data=["Hover Info"]
+        custom_data=["Hover Info"],
+        category_orders={"Strategy": sorted(current_alloc_data["Strategy"].unique(), key=lambda x: (0 if "CMBS" in x else 1, x))}
     )
     
     # Format current pie chart
@@ -2378,30 +2457,30 @@ if st.button(label="Download Portfolio Snapshot PDF"):
     pdf.set_font("Arial", "B", 14)
     pdf.cell(0, 10, "  P&L Analysis", 0, 1, "L", fill=True)
     pdf.set_text_color(0, 0, 0)  # Reset text color to black
-    pdf.ln(8)  # Increased spacing after section header
+    pdf.ln(4)  # Reduced spacing after section header for more compact layout
 
     # Layout parameters for page 2
     page_width = pdf.w - pdf.l_margin - pdf.r_margin
     chart_width = 170  # mm, slightly reduced width for better margins
     
-    # Top 5 P&L Gainers Chart - on its own page
+    # Top 5 P&L Gainers Chart - keep on page 2
     if 'fig_gainers' in locals() or 'fig_gainers' in globals():
         if fig_gainers:
-            # Add a new page for this chart
-            pdf.add_page()
+            # Don't add a new page, keep on page 2
+            pdf.ln(5)
             
             # Create a simple section header with black text
             pdf.set_fill_color(240, 240, 240)  # Light gray background
             pdf.set_text_color(0, 0, 0)  # Black text
-            pdf.set_font("Arial", "B", 14)
-            pdf.cell(0, 10, "  P&L Analysis - Top Gainers", 0, 1, "L", fill=True)
+            pdf.set_font("Arial", "B", 12)  # Smaller font for header
+            pdf.cell(0, 8, "  P&L Analysis - Top Gainers", 0, 1, "L", fill=True)
             pdf.set_text_color(0, 0, 0)  # Reset text color to black
-            pdf.ln(8)  # Increased spacing after section header
+            pdf.ln(3)  # Minimal spacing after section header
             
-            # Configure chart for better visibility
+            # Configure chart for better visibility - reduced height
             fig_gainers.update_layout(
-                margin=dict(l=50, r=50, t=60, b=120),  # Increased margins to prevent label cutoff
-                height=400,  # Taller chart for better visibility
+                margin=dict(l=50, r=50, t=40, b=80),  # Reduced margins for more compact layout
+                height=250,  # Shorter chart to fit on page 2
                 width=800,  # Consistent width
                 font=dict(size=12),  # Larger font size
                 title=dict(
@@ -2434,31 +2513,30 @@ if st.button(label="Download Portfolio Snapshot PDF"):
                     if hasattr(trace, 'textfont'):
                         trace.textfont.update(color='black', size=12, family='Arial Bold')
             
-            # Center the chart on the page with more vertical space
+            # Center the chart on the page with minimal vertical space
             chart_x = pdf.l_margin + (page_width - chart_width) / 2
-            pdf.set_y(50)  # Set specific Y position with plenty of room from the top
             
             # Add chart to PDF without title (title is in the figure)
-            add_chart_to_pdf(pdf, fig_gainers, "", target_x=chart_x, width_mm=chart_width)
+            add_chart_to_pdf(pdf, fig_gainers, "", target_x=chart_x, width_mm=chart_width, no_final_ln=True)
     
-    # P&L by Sub Strategy Chart - on its own page
+    # P&L by Sub Strategy Chart - keep on page 2
     if 'fig_sub_strategy' in locals() or 'fig_sub_strategy' in globals():
         if fig_sub_strategy:
-            # Add a new page for this chart
-            pdf.add_page()
+            # Don't add a new page, keep on page 2
+            pdf.ln(5)
             
             # Create a simple section header with black text
             pdf.set_fill_color(240, 240, 240)  # Light gray background
             pdf.set_text_color(0, 0, 0)  # Black text
-            pdf.set_font("Arial", "B", 14)
-            pdf.cell(0, 10, "  P&L Analysis - By Sub Strategy", 0, 1, "L", fill=True)
+            pdf.set_font("Arial", "B", 12)  # Smaller font for header
+            pdf.cell(0, 8, "  P&L Analysis - By Sub Strategy", 0, 1, "L", fill=True)
             pdf.set_text_color(0, 0, 0)  # Reset text color to black
-            pdf.ln(8)  # Increased spacing after section header
+            pdf.ln(3)  # Minimal spacing after section header
             
-            # Configure chart for better visibility
+            # Configure chart for better visibility - reduced height
             fig_sub_strategy.update_layout(
-                margin=dict(l=50, r=50, t=60, b=120),  # Increased margins to prevent label cutoff
-                height=400,  # Taller chart for better visibility
+                margin=dict(l=50, r=50, t=40, b=80),  # Reduced margins for more compact layout
+                height=250,  # Shorter chart to fit on page 2
                 width=800,  # Consistent width
                 font=dict(size=12),  # Larger font size
                 title=dict(
@@ -2491,12 +2569,12 @@ if st.button(label="Download Portfolio Snapshot PDF"):
                     if hasattr(trace, 'textfont'):
                         trace.textfont.update(color='black', size=12, family='Arial Bold')
             
-            # Center the chart on the page with more vertical space
+            # Center the chart on the page with reduced vertical space
             chart_x = pdf.l_margin + (page_width - chart_width) / 2
-            pdf.set_y(50)  # Set specific Y position with plenty of room from the top
+            # Don't set Y position, use current position for better flow
             
             # Add chart to PDF without title (title is in the figure)
-            add_chart_to_pdf(pdf, fig_sub_strategy, "", target_x=chart_x, width_mm=chart_width)
+            add_chart_to_pdf(pdf, fig_sub_strategy, "", target_x=chart_x, width_mm=chart_width, no_final_ln=True)
     
 
 
@@ -2879,9 +2957,19 @@ def prepare_attribution_data_for_pdf():
         logging.warning("Attribution data missing required columns for PDF generation")
         return None
     
-    # Calculate gross and net returns from the actual data
-    gross_bps = pdf_attribution_data[pdf_attribution_data['Contribution'] > 0]['Contribution'].sum()
-    net_bps = pdf_attribution_data['Contribution'].sum()
+    # Use the Excel total values if available, otherwise fall back to calculated values
+    if 'attribution_strategies_from_key_stats' in globals() and attribution_strategies_from_key_stats:
+        # Use the values directly from the Excel file (Risk Report Format Master Sheet)
+        excel_total_gross_bps = attribution_strategies_from_key_stats.get("Total (Gross)")
+        excel_total_net_bps = attribution_strategies_from_key_stats.get("Total (Net)")
+        
+        # Use Excel values if available, otherwise fall back to calculated values
+        gross_bps = excel_total_gross_bps if excel_total_gross_bps is not None else pdf_attribution_data[pdf_attribution_data['Contribution'] > 0]['Contribution'].sum()
+        net_bps = excel_total_net_bps if excel_total_net_bps is not None else pdf_attribution_data['Contribution'].sum()
+    else:
+        # Fall back to calculated values if Excel values aren't available
+        gross_bps = pdf_attribution_data[pdf_attribution_data['Contribution'] > 0]['Contribution'].sum()
+        net_bps = pdf_attribution_data['Contribution'].sum()
     
     # Log the actual values for debugging
     logging.info(f"Attribution data for PDF - Gross: {gross_bps:.1f} bps, Net: {net_bps:.1f} bps")
@@ -2988,8 +3076,8 @@ key_stats_for_pdf.update({
     "concentration": key_stats.get("top_10_concentration", "N/A"),
     "leverage": key_stats.get("total_leverage", "N/A"),
     "repo_market_value": key_stats.get("repo_mv", "N/A"),
-    # Add the Monthly Return value from kpi_data
-    "monthly_return": kpi_data.get("monthly_return_str", "N/A")
+    # Use the Total (Net) value from attribution data as the monthly return (convert from bps to percentage)
+    "monthly_return_str": f"{attribution_data_for_pdf['net_bps']/100:.2f}%" if attribution_data_for_pdf and 'net_bps' in attribution_data_for_pdf else kpi_data.get("monthly_return_str", "N/A")
 })
 
 # Force refresh of the P&L chart data for the PDF

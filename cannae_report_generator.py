@@ -265,7 +265,12 @@ def create_trading_monitor_tables(trading_data=None):
         # Use the provided data directly
         trading_summary = trading_data.get('summary', [])
         last_5_trades = trading_data.get('last_5_trades', [])
-        top_5_largest = trading_data.get('top_5_largest', [])
+        
+        # Get top 5 largest trades and filter out any with "Collateral" in the security name
+        all_largest_trades = trading_data.get('top_5_largest', [])
+        # Filter out trades where the security name (index 2) starts with "Collateral"
+        top_5_largest = [trade for trade in all_largest_trades 
+                         if len(trade) <= 2 or not str(trade[2]).startswith("Collateral")]
         
         # The issue is that the dashboard is sending "Unknown Sub-Strategy" for the sub-strategy field
         # But the UI is displaying the correct values
@@ -532,7 +537,7 @@ def generate_pdf_report(output_path, key_stats=None, fig_pl_gainers=None, fig_pl
     # Create Key Stats table with default values if not provided
     if key_stats is None:
         key_stats = {
-            "monthly_return_str": "0.63%",  # Updated to 63bp as per Key Stats sheet
+            "monthly_return_str": "1.49%",  # Updated to use Total (Net) from attribution data
             "ytd_return_str": "4.75%",
             "ann_return_str": "8.90%",
             "aum_str": "$1.2B",
@@ -541,8 +546,8 @@ def generate_pdf_report(output_path, key_stats=None, fig_pl_gainers=None, fig_pl
         }
     
     # Create the main returns table
-    # Force the monthly return to be 0.63% (63bp) as specified in the Key Stats sheet
-    monthly_return = "0.63%"  # Hard-coded to 63bp as requested
+    # Use the net_bps value from attribution data for monthly return if available
+    monthly_return = key_stats.get("monthly_return_str", "1.49%")  # Use the value from key_stats or default to 1.49%
     
     returns_data = [
         ["YTD Return", "Monthly Return", "Annualized Return", "AUM"],
@@ -683,9 +688,8 @@ def generate_pdf_report(output_path, key_stats=None, fig_pl_gainers=None, fig_pl
     # Get today's date and format it
     today = datetime.now().strftime("%B %d, %Y")
     
-    # Create date headers with smaller font
-    month_end_date = "April 30, 2025"  # Example date, replace with actual date
-    month_end_header = Paragraph(f"<b>Month-End Allocation (as of {month_end_date})</b>", normal_style)
+    # Create headers with smaller font
+    month_end_header = Paragraph("<b>Month-End Allocation</b>", normal_style)
     current_header = Paragraph(f"<b>Current Allocation (as of {today})</b>", normal_style)
     
     # Create a 2x2 table to hold headers and tables side by side with less spacing
@@ -715,27 +719,36 @@ def generate_pdf_report(output_path, key_stats=None, fig_pl_gainers=None, fig_pl
             'Strategy': ['CMBS', 'ABS', 'CLO', 'Hedges', 'Cash'],
             'Contribution': [85, 35, 15, -10, 5],
         })
-        gross_bps = 93  # Set to match the 93bp value shown
-        net_bps = 63  # Set to 63bp as specified in the Key Stats sheet
+        # Calculate from the sample data
+        gross_bps = attribution_df[attribution_df['Contribution'] > 0]['Contribution'].sum()
+        net_bps = attribution_df['Contribution'].sum()
     elif isinstance(attribution_data, dict) and 'strategies' in attribution_data:
         # New format from dashboard
         strategies = attribution_data['strategies']
         attribution_df = pd.DataFrame(strategies)
-        gross_bps = 93  # Override to match the 93bp value shown
-        net_bps = 63  # Override to 63bp as specified in the Key Stats sheet
+        # Use the values passed from the dashboard
+        if 'gross_bps' in attribution_data and 'net_bps' in attribution_data:
+            gross_bps = attribution_data['gross_bps']
+            net_bps = attribution_data['net_bps']
+        else:
+            # Calculate from data as fallback
+            gross_bps = attribution_df[attribution_df['Contribution'] > 0]['Contribution'].sum()
+            net_bps = attribution_df['Contribution'].sum()
     elif isinstance(attribution_data, pd.DataFrame):
         # Old format (direct DataFrame)
         attribution_df = attribution_data
-        gross_bps = 93  # Override to match the 93bp value shown
-        net_bps = 63  # Override to 63bp as specified in the Key Stats sheet
+        # Calculate from data
+        gross_bps = attribution_df[attribution_df['Contribution'] > 0]['Contribution'].sum()
+        net_bps = attribution_df['Contribution'].sum()
     else:
         # Fallback to empty DataFrame
         attribution_df = pd.DataFrame({
             'Strategy': ['CMBS', 'ABS', 'CLO', 'Hedges', 'Cash'],
             'Contribution': [85, 35, 15, -10, 5],
         })
-        gross_bps = 93  # Override to match the 93bp value shown
-        net_bps = 63  # Override to 63bp as specified in the Key Stats sheet
+        # Calculate from the fallback data
+        gross_bps = attribution_df[attribution_df['Contribution'] > 0]['Contribution'].sum()
+        net_bps = attribution_df['Contribution'].sum()
     
     # Calculate percentages if not already present
     if 'Percentage' not in attribution_df.columns:
@@ -786,9 +799,11 @@ def generate_pdf_report(output_path, key_stats=None, fig_pl_gainers=None, fig_pl
     # Add minimal spacing after combined table
     elements.append(Spacer(1, 3))
     
-    # Add P&L charts if available with smaller dimensions
+    # Add page break before the P&L charts section
+    elements.append(PageBreak())
+    
+    # Add P&L gainers chart again on page 2 (if available)
     if fig_pl_gainers is not None:
-        # Add P&L gainers chart with smaller header
         elements.append(Paragraph("P&L by Top Gainers/Losers", section_style))
         elements.append(Spacer(1, 2))  # Minimal spacing
         
@@ -828,20 +843,17 @@ def generate_pdf_report(output_path, key_stats=None, fig_pl_gainers=None, fig_pl
                     'Cannae MTD PL': [150000, 120000, 90000, 75000, 60000]
                 })
             
-            # Create chart with matplotlib - compact version for page 1
-            chart_img = create_pnl_chart(gainers_df, "Top 5 PnL Gainers/Losers", 'ID', 'Cannae MTD PL', "gainers_chart.png", compact=True)
+            # Create chart with matplotlib - full size for page 2
+            chart_img = create_pnl_chart(gainers_df, "Top 5 PnL Gainers/Losers", 'ID', 'Cannae MTD PL', "gainers_chart.png", compact=False)
             
-            # Add the image to the PDF - larger for page 1 to use available space
-            img = Image(chart_img, width=5.5*inch, height=2.4*inch)  # Larger size to use available space on page 1
+            # Add the image to the PDF - full size for page 2
+            img = Image(chart_img, width=5.5*inch, height=2.5*inch)
             elements.append(img)
-            elements.append(Spacer(1, 3))  # Minimal spacing
+            elements.append(Spacer(1, 10))  # Add more spacing between charts
         except Exception as e:
             # If chart generation fails, add an error message
             elements.append(Paragraph(f"Error with P&L Gainers chart: {str(e)}", normal_style))
-            elements.append(Spacer(1, 3))  # Minimal spacing
-    
-    # Add page break before second P&L chart so it starts on page 2
-    elements.append(PageBreak())
+            elements.append(Spacer(1, 10))  # Add more spacing between charts
     
     if fig_pl_substrat is not None:
         # Add P&L by sub-strategy chart with smaller header
@@ -895,6 +907,9 @@ def generate_pdf_report(output_path, key_stats=None, fig_pl_gainers=None, fig_pl
             # If chart generation fails, add an error message
             elements.append(Paragraph(f"Error with P&L Sub-Strategy chart: {str(e)}", normal_style))
             elements.append(Spacer(1, 3))  # Minimal spacing
+    
+    # Add page break before Trading Monitor section so it starts on page 3
+    elements.append(PageBreak())
     
     # Add Trading Monitor section
     elements.append(Paragraph("Trading Monitor", section_style))
