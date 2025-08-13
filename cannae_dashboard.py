@@ -1380,21 +1380,52 @@ if not TRADES.empty:
     # Convert Proceeds to absolute value for sorting by size
     filtered_trades["Abs_Proceeds"] = filtered_trades["Proceeds"].abs()
     
-    # Get the last 2 trades by date
-    last_2_trades = filtered_trades.sort_values("Trade Date", ascending=False).head(2)
+    # Get the last 5 trades by date for display
+    last_5_trades_for_display = filtered_trades.sort_values("Trade Date", ascending=False).head(5)
     
     # Get the top 5 largest trades by absolute market value
     top_5_largest = filtered_trades.sort_values("Abs_Proceeds", ascending=False).head(5)
     
-    # Combine and remove duplicates
-    selected_trades = pd.concat([last_2_trades, top_5_largest]).drop_duplicates()
+    # Combine and remove duplicates for other processing
+    selected_trades = pd.concat([last_5_trades_for_display, top_5_largest]).drop_duplicates()
     
     # Create a Trading Monitor table similar to the example
     # Create a copy of filtered_trades for trading summary
     trading_summary = filtered_trades.copy()
     
-    # Map Transaction types to Buy/Sell categories
-    trading_summary["Action"] = trading_summary["Transaction"].map(lambda x: "Buy" if "buy" in str(x).lower() else "Sell")
+    # Map Transaction types to Buy/Sell categories with improved logic
+    def classify_transaction(transaction):
+        if pd.isna(transaction):
+            return "Unknown"
+        
+        transaction_lower = str(transaction).lower()
+        
+        # Check for buy indicators
+        if any(buy_term in transaction_lower for buy_term in ["buy", "purchase", "acquire", "long"]):
+            return "Buy"
+        # Check for sell indicators  
+        elif any(sell_term in transaction_lower for sell_term in ["sell", "sale", "dispose", "short"]):
+            return "Sell"
+        else:
+            # For unknown transaction types, check the proceeds sign as a fallback
+            # This is a backup method - negative proceeds often indicate purchases
+            return "Unknown"
+    
+    trading_summary["Action"] = trading_summary["Transaction"].apply(classify_transaction)
+    
+    # Debug: Show transaction type distribution
+    if st.checkbox("Show Transaction Type Debug Info", value=False):
+        st.write("**Transaction Type Analysis:**")
+        transaction_counts = trading_summary["Transaction"].value_counts()
+        action_counts = trading_summary["Action"].value_counts()
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write("Raw Transaction Types:")
+            st.dataframe(transaction_counts.reset_index())
+        with col2:
+            st.write("Classified Actions:")
+            st.dataframe(action_counts.reset_index())
     
     # Calculate metrics by strategy
     strategy_metrics = {}
@@ -1489,18 +1520,39 @@ if not TRADES.empty:
         axis=1
     )
     
+    # Apply the same transaction classification to selected_trades
+    selected_trades["Action"] = selected_trades["Transaction"].apply(classify_transaction)
+    
     # Make sells negative by flipping the sign again for sell transactions
-    selected_trades.loc[selected_trades["Transaction"].str.lower() == "sell", "Adjusted Proceeds"] *= -1
+    selected_trades.loc[selected_trades["Action"] == "Sell", "Adjusted Proceeds"] *= -1
     
     selected_trades["Formatted Proceeds"] = selected_trades["Adjusted Proceeds"].apply(
         lambda x: f"(${abs(x):,.2f})" if x < 0 else f"${x:,.2f}"
     )
     
-    # Get last 5 trades by date
-    last_5_trades = selected_trades.sort_values("Trade Date", ascending=False).head(5)
+    # Use the already selected last 5 trades by date
+    last_5_trades = last_5_trades_for_display.copy()
+    
+    # Apply the same processing to the last 5 trades for display
+    last_5_trades["Adjusted Proceeds"] = last_5_trades.apply(
+        lambda row: row["Proceeds"] * -1,
+        axis=1
+    )
+    
+    # Apply transaction classification
+    last_5_trades["Action"] = last_5_trades["Transaction"].apply(classify_transaction)
+    
+    # Make sells negative by flipping the sign again for sell transactions
+    last_5_trades.loc[last_5_trades["Action"] == "Sell", "Adjusted Proceeds"] *= -1
+    
+    last_5_trades["Formatted Proceeds"] = last_5_trades["Adjusted Proceeds"].apply(
+        lambda x: f"(${abs(x):,.2f})" if x < 0 else f"${x:,.2f}"
+    )
     
     # Get top 5 largest trades by absolute value of proceeds
+    # Exclude trades that start with "Collateral"
     largest_5_trades = selected_trades.copy()
+    largest_5_trades = largest_5_trades[~largest_5_trades["Security Description"].str.startswith("Collateral", na=False)]
     largest_5_trades["Abs Proceeds"] = largest_5_trades["Adjusted Proceeds"].abs()
     largest_5_trades = largest_5_trades.sort_values("Abs Proceeds", ascending=False).head(5)
     
@@ -1556,7 +1608,7 @@ else:
     TRADES["Action"] = None
 
 # ---------- ATTRIBUTION ----------
-st.markdown("## Return Attribution by Strategy")
+st.markdown("## Return Attribution by Strategy (June)")
 
 attribution_strategies_from_key_stats = key_stats.get('attribution_by_strategy', {}) # Uses key_stats populated from extract_key_stats_from_risk_report()
 attribution_list_for_df = []
