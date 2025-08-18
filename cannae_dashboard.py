@@ -1112,8 +1112,8 @@ with col2:
         color="Strategy",
         color_discrete_map=strategy_color_map,
         color_discrete_sequence=["#0F766E", "#0E7490", "#0369A1", "#1D4ED8", "#4338CA", "#6D28D9"], # Blue-teal palette fallback
-        custom_data=["Hover Info"],
-        category_orders={"Strategy": sorted(current_alloc_data["Strategy"].unique(), key=lambda x: (0 if "CMBS" in x else 1, x))}
+        custom_data=["Hover Info"]
+        # Removed category_orders parameter which was causing errors
     )
     
     # Format current pie chart
