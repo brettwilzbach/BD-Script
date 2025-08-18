@@ -1,14 +1,16 @@
 # Core packages
-streamlit==1.17.0
+streamlit>=1.22
 
 # Pre-built binary packages (faster installation)
 numpy==1.24.0
-pandas==2.0.0
+pandas>=2.0
 pyarrow==14.0.1
 
 # Visualization
 plotly==5.5.0
 matplotlib==3.5.1
+altair<5
+vega-datasets>=0.9
 
 # PDF handling (slimmed down)
 fpdf==1.7.2
