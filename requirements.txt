@@ -5,12 +5,14 @@ streamlit>=1.22
 numpy==1.24.0
 pandas>=2.0
 pyarrow==14.0.1
+openpyxl>=3.0.0
 
 # Visualization
 plotly==5.5.0
 matplotlib==3.5.1
 altair<5
 vega-datasets>=0.9
+kaleido>=0.2.1
 
 # PDF handling (slimmed down)
 fpdf==1.7.2

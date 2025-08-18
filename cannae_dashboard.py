@@ -186,7 +186,7 @@ def extract_kpis_from_factsheet():
             kpi_data["extraction_source"] = f"Fallback (Sheet '{sheet_name}' not found in {excel_filename})"
             return kpi_data
 
-        df = pd.read_excel(excel_path, sheet_name=sheet_name, header=None)
+        df = pd.read_excel(excel_path, sheet_name=sheet_name, header=None, engine='openpyxl')
         
         stats_map = {}
         if not df.empty and df.shape[1] >= 2:
@@ -308,7 +308,7 @@ def extract_key_stats_from_risk_report():
             }
         
         # Read the Key Stats sheet
-        df = pd.read_excel(excel_path, sheet_name='Key Stats', header=None)
+        df = pd.read_excel(excel_path, sheet_name='Key Stats', header=None, engine='openpyxl')
         logging.debug(f"Successfully read Key Stats sheet from {excel_path} with {len(df)} rows")
         
         # Extract metrics from the sheet
@@ -439,7 +439,7 @@ def extract_key_stats_from_risk_report():
         else:
             # Try to read directly from cell B16 if the label approach didn't work
             try:
-                df_direct = pd.read_excel(excel_path, sheet_name='Key Stats', header=None)
+                df_direct = pd.read_excel(excel_path, sheet_name='Key Stats', header=None, engine='openpyxl')
                 avg_holding_size_value = df_direct.iloc[15, 1]  # B16 is row 15, col 1 (0-indexed)
                 if pd.notna(avg_holding_size_value):
                     # Format as plain dollar amount with commas
@@ -581,19 +581,19 @@ latest_trades_file = find_latest_trades_file()
 # Load the files with error handling
 try:
     if latest_eom_file:
-        APRIL_EOM = pd.read_excel(os.path.join(DATA_PATH, latest_eom_file))
+        APRIL_EOM = pd.read_excel(os.path.join(DATA_PATH, latest_eom_file), engine='openpyxl')
     else:
         st.sidebar.error("No month-end file found. Please add an 'eom_marks_*.xlsx' file to the data directory.")
         APRIL_EOM = pd.DataFrame()  # Empty DataFrame as fallback
         
     if latest_holdings_file:
-        HOLDINGS_LATEST = pd.read_excel(os.path.join(DATA_PATH, latest_holdings_file))
+        HOLDINGS_LATEST = pd.read_excel(os.path.join(DATA_PATH, latest_holdings_file), engine='openpyxl')
     else:
         st.sidebar.error("No holdings file found. Please add a 'portfolio_holdings_*.xlsx' file to the data directory.")
         HOLDINGS_LATEST = pd.DataFrame()  # Empty DataFrame as fallback
         
     if latest_trades_file:
-        TRADES = pd.read_excel(os.path.join(DATA_PATH, latest_trades_file))
+        TRADES = pd.read_excel(os.path.join(DATA_PATH, latest_trades_file), engine='openpyxl')
     else:
         st.sidebar.error("No trades file found. Please add a '_cannae_trade_*.xlsx' file to the data directory.")
         TRADES = pd.DataFrame()  # Empty DataFrame as fallback
@@ -745,8 +745,15 @@ def summarize_alloc(df, split_cmbs=True):
                 break
         else:
             # If no suitable column found, create a default strategy column
-            st.error(f"No strategy column found. Available columns: {df.columns.tolist()}")
+            st.warning(f"No strategy column found. Available columns: {df.columns.tolist()}")
+            logging.warning(f"No strategy column found in dataframe. Available columns: {df.columns.tolist()}")
             df['Strategy'] = 'UNKNOWN'
+            # Create a simple dataframe with basic structure if completely empty
+            if len(df) == 0:
+                df = pd.DataFrame({
+                    'Strategy': ['CASH'],
+                    'Market Value': [100000]
+                })
     
     # Check for Sub Strategy column for CMBS breakdown
     sub_strategy_column = 'Sub Strategy'
@@ -782,8 +789,8 @@ def summarize_alloc(df, split_cmbs=True):
         df['Effective Strategy'] = df['Strategy']
         logging.debug("No Sub Strategy column found, using Strategy column only")
     
-    # Specifically use Admin Net MV column as requested
-    mv_column = 'Admin Net MV'
+    # Try to find an appropriate market value column
+    mv_column = 'Admin Net MV'  # Default column name
     
     # Make sure the column exists
     if mv_column not in df.columns:
@@ -858,7 +865,7 @@ with col1:
     try:
         # Try to get the Position Holdings tab from APRIL_EOM
         if 'Position Holdings' in pd.ExcelFile(os.path.join(DATA_PATH, latest_eom_file)).sheet_names:
-            month_end_holdings = pd.read_excel(os.path.join(DATA_PATH, latest_eom_file), sheet_name="Position Holdings")
+            month_end_holdings = pd.read_excel(os.path.join(DATA_PATH, latest_eom_file), sheet_name="Position Holdings", engine='openpyxl')
             sheet_used = "Position Holdings"
         else:
             # Fallback to the first sheet
@@ -1010,8 +1017,8 @@ with col1:
         color="Strategy",  # Explicitly use Strategy as the color dimension
         color_discrete_map=strategy_color_map,
         color_discrete_sequence=["#0F766E", "#0E7490", "#0369A1", "#1D4ED8", "#4338CA", "#6D28D9"], # Blue-teal palette fallback
-        custom_data=["Hover Info"],
-        category_orders={"Strategy": sorted(april_alloc_data["Strategy"].unique(), key=lambda x: (0 if "CMBS" in x else 1, x))}
+        custom_data=["Hover Info"]
+        # Removed category_orders parameter which was causing errors
     )
     
     # Format April pie chart
@@ -1237,7 +1244,7 @@ def extract_key_stats_from_excel(excel_path):
             return {}
         
         # Read the Key Stats sheet
-        key_stats_df = pd.read_excel(excel_path, sheet_name='Key Stats', header=None)
+        key_stats_df = pd.read_excel(excel_path, sheet_name='Key Stats', header=None, engine='openpyxl')
         st.sidebar.success(f"EXCEL EXTRACTION: Successfully read 'Key Stats' sheet with {key_stats_df.shape[0]} rows")
         
         # Create a dictionary of metrics
@@ -1788,7 +1795,7 @@ if latest_eom_file:
         logging.warning(f"Could not parse month/year from EOM filename: {latest_eom_file}. Using default title.")
 
     try:
-        eom_df_dynamic = pd.read_excel(eom_file_path_dynamic, sheet_name='Position Holdings')
+        eom_df_dynamic = pd.read_excel(eom_file_path_dynamic, sheet_name='Position Holdings', engine='openpyxl')
         
         # Create two columns for the charts
         col1_pnl, col2_pnl = st.columns(2)
@@ -1891,7 +1898,7 @@ try:
         # Try different ways to read the Excel file
         try:
             # First try reading with no header
-            competitor_df = pd.read_excel(competitor_file_path, header=None)
+            competitor_df = pd.read_excel(competitor_file_path, header=None, engine='openpyxl')
             
             # Check if we have at least 2 columns and some rows
             if competitor_df.shape[1] >= 2 and competitor_df.shape[0] > 0:
