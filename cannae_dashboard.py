@@ -279,7 +279,7 @@ def extract_key_stats_from_risk_report():
             'monthly_carry_bps': '61 bps',
             'bond_line_items': '3',
             'bond_breakdown': {'CMBS': 1, 'ABS': 2, 'CLO': 0},
-            'avg_holding_size': '$5.17mm',
+            'avg_holding_size': 'N/A',
             'top_10_concentration': '20.6%',
             'extraction_source': 'hardcoded_fallback'
         }
@@ -302,7 +302,7 @@ def extract_key_stats_from_risk_report():
                 'monthly_carry_bps': '61 bps',
                 'bond_line_items': '3',
                 'bond_breakdown': {'CMBS': 1, 'ABS': 2, 'CLO': 0},
-                'avg_holding_size': '$5.17mm',
+                'avg_holding_size': 'N/A',
                 'top_10_concentration': '20.6%',
                 'extraction_source': 'hardcoded_fallback'
             }
@@ -430,9 +430,26 @@ def extract_key_stats_from_risk_report():
             
         # Average Holding Size
         if 'Average Holding Size ($mm)' in metrics:
-            key_stats['avg_holding_size'] = f"${float(metrics['Average Holding Size ($mm)']):.2f}mm"
+            # Format as plain dollar amount with commas
+            avg_size = float(metrics['Average Holding Size ($mm)'])
+            # If the value is in millions, convert to full dollar amount
+            if avg_size < 1000:  # If value is already in millions (e.g., 3.667)
+                avg_size = avg_size * 1000000  # Convert to full dollar amount
+            key_stats['avg_holding_size'] = f"${int(avg_size):,}"
         else:
-            key_stats['avg_holding_size'] = "$5.17mm"  # Fallback
+            # Try to read directly from cell B16 if the label approach didn't work
+            try:
+                df_direct = pd.read_excel(excel_path, sheet_name='Key Stats', header=None)
+                avg_holding_size_value = df_direct.iloc[15, 1]  # B16 is row 15, col 1 (0-indexed)
+                if pd.notna(avg_holding_size_value):
+                    # Format as plain dollar amount with commas
+                    avg_size = float(avg_holding_size_value)
+                    key_stats['avg_holding_size'] = f"${int(avg_size):,}"
+                else:
+                    key_stats['avg_holding_size'] = "N/A"  # No fallback, show N/A if not found
+            except Exception as e:
+                logging.warning(f"Could not read Average Holding Size from cell B16: {e}")
+                key_stats['avg_holding_size'] = "N/A"  # No fallback, show N/A if not found
             
         # Top 10 Concentration
         if 'Top 10% Concentration' in metrics:
@@ -498,7 +515,7 @@ def extract_key_stats_from_risk_report():
             'monthly_carry_bps': '61 bps',
             'bond_line_items': '3',
             'bond_breakdown': {'CMBS': 1, 'ABS': 2, 'CLO': 0},
-            'avg_holding_size': '$5.17mm',
+            'avg_holding_size': 'N/A',
             'top_10_concentration': '20.6%',
             'extraction_source': 'hardcoded_fallback'
         }
@@ -518,7 +535,7 @@ def extract_key_stats_from_risk_report():
                 'pct_risk_rating_1': '52.3%', 'floating_rate_pct': '21.2%',
                 'monthly_carry_bps': '61 bps', 'bond_line_items': '3',
                 'bond_breakdown': {'CMBS': 1, 'ABS': 2, 'CLO': 0},
-                'avg_holding_size': '$5.17mm', 'top_10_concentration': '20.6%',
+                'avg_holding_size': 'N/A', 'top_10_concentration': '20.6%',
                 'extraction_source': 'hardcoded_fallback_outer_exception'
             }
         logging.debug(f"Returning key_stats due to outer exception in extract_key_stats_from_risk_report: {key_stats}")
@@ -1608,7 +1625,7 @@ else:
     TRADES["Action"] = None
 
 # ---------- ATTRIBUTION ----------
-st.markdown("## Return Attribution by Strategy (June)")
+st.markdown("## Return Attribution by Strategy")
 
 attribution_strategies_from_key_stats = key_stats.get('attribution_by_strategy', {}) # Uses key_stats populated from extract_key_stats_from_risk_report()
 attribution_list_for_df = []

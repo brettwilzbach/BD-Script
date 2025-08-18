@@ -673,7 +673,7 @@ def generate_pdf_report(output_path, key_stats=None, fig_pl_gainers=None, fig_pl
     # First, create each allocation table
     # Handle april_display safely - check if it exists and is not empty
     if april_display is not None and not isinstance(april_display, bool) and hasattr(april_display, 'empty') and not april_display.empty:
-        april_table = create_allocation_table(april_display, "Month-End Allocation")
+        april_table = create_allocation_table(april_display, "July Month-End Allocation")
     else:
         # Create an empty table if no data
         april_table = Table([["No Month-End Data"]], colWidths=[2.8*inch])
@@ -689,7 +689,7 @@ def generate_pdf_report(output_path, key_stats=None, fig_pl_gainers=None, fig_pl
     today = datetime.now().strftime("%B %d, %Y")
     
     # Create headers with smaller font
-    month_end_header = Paragraph("<b>Month-End Allocation</b>", normal_style)
+    month_end_header = Paragraph("<b>July Month-End Allocation</b>", normal_style)
     current_header = Paragraph(f"<b>Current Allocation (as of {today})</b>", normal_style)
     
     # Create a 2x2 table to hold headers and tables side by side with less spacing
