@@ -1437,20 +1437,6 @@ if not TRADES.empty:
     
     trading_summary["Action"] = trading_summary["Transaction"].apply(classify_transaction)
     
-    # Debug: Show transaction type distribution
-    if st.checkbox("Show Transaction Type Debug Info", value=False):
-        st.write("**Transaction Type Analysis:**")
-        transaction_counts = trading_summary["Transaction"].value_counts()
-        action_counts = trading_summary["Action"].value_counts()
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.write("Raw Transaction Types:")
-            st.dataframe(transaction_counts.reset_index())
-        with col2:
-            st.write("Classified Actions:")
-            st.dataframe(action_counts.reset_index())
-    
     # Calculate metrics by strategy
     strategy_metrics = {}
     for strategy in ["CMBS", "AIRCRAFT", "ABS", "Hedges", "CLO"]:
@@ -1835,12 +1821,12 @@ if latest_eom_file:
             # Group by Sub Strategy and calculate total P&L
             sub_strategy_pnl = eom_df_dynamic.groupby('Sub Strategy')['Cannae MTD PL'].sum().reset_index()
             
-            # Sort by absolute P&L value to get the most significant positions (both gains and losses)
-            sub_strategy_pnl['Abs_PnL'] = sub_strategy_pnl['Cannae MTD PL'].abs()
-            sub_strategy_pnl = sub_strategy_pnl.sort_values('Abs_PnL', ascending=False)
+            # Filter for positive P&L values only and sort by P&L value (highest first)
+            positive_pnl = sub_strategy_pnl[sub_strategy_pnl['Cannae MTD PL'] > 0]
+            positive_pnl = positive_pnl.sort_values('Cannae MTD PL', ascending=False)
             
-            # Take exactly the top 5 positions by absolute P&L
-            top_5_sub_strategy = sub_strategy_pnl.head(5)
+            # Take exactly the top 5 positions with positive P&L
+            top_5_sub_strategy = positive_pnl.head(5)
             
             # Format the P&L values for display
             top_5_sub_strategy['Formatted PnL'] = top_5_sub_strategy['Cannae MTD PL'].apply(
