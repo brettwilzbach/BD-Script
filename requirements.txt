@@ -15,8 +15,9 @@ vega-datasets>=0.9
 # PDF handling (slimmed down)
 fpdf==1.7.2
 pdfplumber==0.7.0
-# pillow and reportlab are installed separately in the Dockerfile
-# to ensure we use pre-built wheels
+reportlab>=3.6.0
+Pillow>=9.0.0
+# Previously installed separately in the Dockerfile
 
 # Dependencies
 python-dateutil==2.8.2
